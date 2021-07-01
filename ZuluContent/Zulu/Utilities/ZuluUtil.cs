@@ -1,12 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using Server;
+using ZuluContent.Zulu.Items;
 
 namespace Scripts.Zulu.Utilities
 {
@@ -113,12 +112,10 @@ namespace Scripts.Zulu.Utilities
                 if (sourceProperty.PropertyType != targetProperty.PropertyType &&
                     !targetProperty.PropertyType.IsAssignableFrom(sourceProperty.PropertyType))
                 {
-                    bool hasImplicitMethod = (
-                        from method in sourceProperty.PropertyType.GetMethods(BindingFlags.Static | BindingFlags.Public)
-                        where method.Name == "op_Implicit" && method.ReturnType == targetProperty.PropertyType ||
-                              method.Name == "op_Explicit" && method.ReturnType == targetProperty.PropertyType
-                        select method
-                    ).Any();
+                    var hasImplicitMethod = sourceProperty.PropertyType
+                        .GetMethods(BindingFlags.Static | BindingFlags.Public)
+                        .Any(method => method.Name == "op_Implicit" && method.ReturnType == targetProperty.PropertyType ||
+                                       method.Name == "op_Explicit" && method.ReturnType == targetProperty.PropertyType);
 
                     if (!hasImplicitMethod)
                     {
@@ -188,6 +185,20 @@ namespace Scripts.Zulu.Utilities
             var lambda = Expression.Lambda<Action<TSource, TTarget>>(body, source, target);
 
             return lambda.Compile();
+        }
+        
+        public static Func<T> ItemCreatorLambda<T>(Type type) where T : Item
+        {
+            var constructor = type.GetConstructor(Array.Empty<Type>());
+
+            if (constructor == null)
+            {
+                throw new ArgumentOutOfRangeException(nameof(type), "No parameterless constructor found");
+            }
+
+            var expr = Expression.Lambda<Func<T>>(Expression.New(constructor), null).Compile();
+
+            return expr;
         }
     }
 }
